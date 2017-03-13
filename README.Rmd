@@ -1,6 +1,6 @@
 ---
-title: "Problem Set 3. Due Thurs March 2 5pm"
-author: "Student name"
+title: "PS3"
+author: "Rachel Neve"
 date: "Feb 23, 2017"
 output: html_document
 ---
@@ -10,6 +10,8 @@ knitr::opts_chunk$set(echo = TRUE, comment = "#>")
 ```
 
 # Submission
+
+#Submission
 
 1. Fork this repository to your own account
 1. Make changes to the `README.Rmd` file (including the author field above).
@@ -43,6 +45,7 @@ First we need load the data.
 
 ```{r load_raw_data, message = FALSE}
 library(tidyverse)
+library(stringr)
 
 # bgh data
 bgh_url <- 'http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE43163&format=file&file=GSE43163_CompleteCountTable_Bgh.txt.gz'
@@ -83,10 +86,13 @@ Now that the raw data are loaded, your first task is to tidy the data with `tidy
 The key steps are to `gather()` the data into key-value pairs and then `separate()` the information from the key column into new columns.
 
 ```{r problem_1}
-# add tidying code here
+# tidying code
+raw_data %>% 
+  gather(key, value, -gene.name) %>% 
+  separate(key, into = c('plant', 'fungus', 'time.point', 'rep'), sep = '_') -> cleaned_data
 
 # report the cleaned_data by just naming it, uncomment the following line:
-# cleaned_data
+cleaned_data
 ```
 
 ## Problem 3
@@ -101,6 +107,9 @@ raw_data | awk '$4 == "6hpi"' | sort -k6nr | head -n 1 | cut -f2
 
 ```{r}
 # translate to dplyr code
+cleaned_data %>% filter(time.point == "6hpi") %>% arrange(desc(value)) %>%
+  head(1) %>% select(plant)
+  
 ```
 
 Which plant / fungus pair has the highest expression in the 18hpi time point?
@@ -111,6 +120,7 @@ raw_data | awk '$4 == "18hpi"' | sort -k6nr | head -n 1 | cut -f2,3
 
 ```{r}
 # translate to dplyr code
+cleaned_data %>% filter(time.point == "18hpi") %>% arrange(desc(value)) %>% head(1) %>% select(plant, fungus)
 ```
 
 ## Problem 3
@@ -128,7 +138,7 @@ Identify the top 3 most consistently differentially expressed genes between the 
 ```{r reformat_time, eval=FALSE}
 cleaned_data %>%
   mutate(time.value = str_replace(time.point, 'hpi', ''),
-         time.hpi = str_c('hpi.', time.value))
+         time.hpi = str_c('hpi.', time.value)) -> cleaned_data_hpi
 ```
 
 2. Create a new column containing the expression difference between the relevant time points.
@@ -138,11 +148,25 @@ cleaned_data %>%
 4. Sort by these statistics and use the `dplyr` verb `slice` to pull the ones you want (i.e., the top 3). Note you will have to remove `gene.name` from the grouping so that sorting works.
 
 ```{r problem_3}
+cleaned_data_hpi %>% select(-time.point, -time.value) %>% spread(time.hpi, value) %>%
+  mutate(expr.diff = hpi.24 - hpi.6) %>%
+  group_by(gene.name, plant, fungus) %>%
+  summarise(expr.var = var(expr.diff), mean = mean(abs(expr.diff))) -> expr_data
+
+expr_data %>%
+  arrange(desc(expr.var)) %>% unique(plant) %>% unique(fungus) %>% head(3) %>% select(gene.name, plant, fungus) -> genes
+
+genes
+
+#How do I select each unique plant and fungus pair here?
+#How should I use slice in this context?
 ```
 
 ## Problem 4
 
-Now examine the above final data frame above and write a few sentences putting inline code in least 3 places. For example, There are `r nrow(mtcars)` rows of data in `mtcars`.
+Now examine the above final data frame above and write a few sentences putting inline code in least 3 places. For example, "There are `r nrow(mtcars)` rows of data in `mtcars`."
+#Should I be summarizing the output of the most differentially expressed genes or about the data frame "expr_data?"
+
 
 ## Problem 5
 
@@ -159,4 +183,7 @@ Plot the expression (`value`) by time (`hpi`) for the above genes. Format the pl
 Extra credit: add error bars to the plot (use `geom_errorbar`).
 
 ```{r problem_5}
+cleaned_data_hpi[genes] %>%
+  ggplot(aes(time.value, value, color = gene.name)) + geom_point()
+#I'm not sure how to get the right genes from above to start plotting.
 ```
