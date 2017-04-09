@@ -99,7 +99,7 @@ cleaned_data
 
 You need to translate what you learned on the command line into the R world.
 
-Which plant has the highest expression of any gene in the 6hpi time point?
+Which plant has the highest expression of any gene in the 6hpi time point? pps
 
 ```{bash, eval=FALSE}
 raw_data | awk '$4 == "6hpi"' | sort -k6nr | head -n 1 | cut -f2
@@ -112,7 +112,7 @@ cleaned_data %>% filter(time.point == "6hpi") %>% arrange(desc(value)) %>%
   
 ```
 
-Which plant / fungus pair has the highest expression in the 18hpi time point?
+Which plant / fungus pair has the highest expression in the 18hpi time point?: pps and A6
 
 ```{bash, eval=FALSE}
 raw_data | awk '$4 == "18hpi"' | sort -k6nr | head -n 1 | cut -f2,3
@@ -139,6 +139,8 @@ Identify the top 3 most consistently differentially expressed genes between the 
 cleaned_data %>%
   mutate(time.value = str_replace(time.point, 'hpi', ''),
          time.hpi = str_c('hpi.', time.value)) -> cleaned_data_hpi
+
+cleaned_data_hpi
 ```
 
 2. Create a new column containing the expression difference between the relevant time points.
@@ -148,25 +150,23 @@ cleaned_data %>%
 4. Sort by these statistics and use the `dplyr` verb `slice` to pull the ones you want (i.e., the top 3). Note you will have to remove `gene.name` from the grouping so that sorting works.
 
 ```{r problem_3}
-cleaned_data_hpi %>% select(-time.point, -time.value) %>% spread(time.hpi, value) %>%
+cleaned_data_hpi %>% 
+  select(-time.point, -time.value) %>% 
+  spread(time.hpi, value) %>%
   mutate(expr.diff = hpi.24 - hpi.6) %>%
   group_by(gene.name, plant, fungus) %>%
   summarise(expr.var = var(expr.diff), mean = mean(abs(expr.diff))) -> expr_data
 
 expr_data %>%
-  arrange(desc(expr.var)) %>% unique(plant) %>% unique(fungus) %>% head(3) %>% select(gene.name, plant, fungus) -> genes
+  group_by(plant, fungus) %>% arrange(desc(expr.var)) %>% slice(3) %>% select(gene.name, plant, fungus) -> genes
 
 genes
-
-#How do I select each unique plant and fungus pair here?
-#How should I use slice in this context?
 ```
 
 ## Problem 4
 
 Now examine the above final data frame above and write a few sentences putting inline code in least 3 places. For example, "There are `r nrow(mtcars)` rows of data in `mtcars`."
-#Should I be summarizing the output of the most differentially expressed genes or about the data frame "expr_data?"
-
+# There are `r nrow(genes)` rows of data in `genes`. There are `r ncol(genes)` columns of data in `genes`. The most expressed genes are `r slice(3)`.
 
 ## Problem 5
 
@@ -183,7 +183,13 @@ Plot the expression (`value`) by time (`hpi`) for the above genes. Format the pl
 Extra credit: add error bars to the plot (use `geom_errorbar`).
 
 ```{r problem_5}
-cleaned_data_hpi[genes] %>%
-  ggplot(aes(time.value, value, color = gene.name)) + geom_point()
-#I'm not sure how to get the right genes from above to start plotting.
+semi_join(cleaned_data_hpi, genes, by = "gene.name") -> joined
+  joined %>% 
+  ggplot(aes(time.value, value, color = gene.name, shape = rep)) + 
+    geom_point() + 
+    geom_smooth(method = "gam", se = FALSE) +
+    xlab('time') + 
+    facet_wrap(facets = c('plant', 'fungus')) + 
+    theme_bw() + 
+    ggtitle('Expression.Over.Time')
 ```
